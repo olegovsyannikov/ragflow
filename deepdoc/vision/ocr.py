@@ -95,11 +95,12 @@ def load_model(model_dir, nm, device_id: int | None = None):
 
     options = ort.SessionOptions()
     options.enable_cpu_mem_arena = False
-    # Use parallel execution for better CPU utilization
+    # Use parallel execution for better CPU utilization on multi-page documents
     options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
-    # Allow configurable thread counts for better performance on multi-core systems
-    options.intra_op_num_threads = int(os.environ.get("ONNX_INTRA_THREADS", "4"))
-    options.inter_op_num_threads = int(os.environ.get("ONNX_INTER_THREADS", "4"))
+    # Conservative thread defaults (2/2) - tune via ONNX_INTRA_THREADS and ONNX_INTER_THREADS
+    # For 2-4 vCPU systems, consider: ONNX_INTRA_THREADS=4 ONNX_INTER_THREADS=2
+    options.intra_op_num_threads = int(os.environ.get("ONNX_INTRA_THREADS", "2"))
+    options.inter_op_num_threads = int(os.environ.get("ONNX_INTER_THREADS", "2"))
 
     # https://github.com/microsoft/onnxruntime/issues/9509#issuecomment-951546580
     # Shrink GPU memory after execution
@@ -554,7 +555,7 @@ class OCR:
                 model_dir = os.path.join(
                         get_project_base_directory(),
                         "rag/res/deepdoc")
-                
+
                 # Append muti-gpus task to the list
                 if settings.PARALLEL_DEVICES > 0:
                     self.text_detector = []
@@ -570,7 +571,7 @@ class OCR:
                 model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
                                               local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
                                               local_dir_use_symlinks=False)
-                
+
                 if settings.PARALLEL_DEVICES > 0:
                     self.text_detector = []
                     self.text_recognizer = []
