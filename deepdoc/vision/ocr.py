@@ -95,12 +95,15 @@ def load_model(model_dir, nm, device_id: int | None = None):
 
     options = ort.SessionOptions()
     options.enable_cpu_mem_arena = False
-    # Use parallel execution for better CPU utilization on multi-page documents
-    options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
-    # Conservative thread defaults (2/2) - tune via ONNX_INTRA_THREADS and ONNX_INTER_THREADS
-    # For 2-4 vCPU systems, consider: ONNX_INTRA_THREADS=4 ONNX_INTER_THREADS=2
+    # Use sequential execution for stability (parallel mode causes hangs on some documents)
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    # Conservative thread defaults - tune via ONNX_INTRA_THREADS and ONNX_INTER_THREADS
     options.intra_op_num_threads = int(os.environ.get("ONNX_INTRA_THREADS", "2"))
     options.inter_op_num_threads = int(os.environ.get("ONNX_INTER_THREADS", "2"))
+
+    # Add timeout to prevent infinite hangs
+    options.add_session_config_entry("session.intra_op_thread_affinities", "")
+    options.add_session_config_entry("session.force_spinning_stop", "1")
 
     # https://github.com/microsoft/onnxruntime/issues/9509#issuecomment-951546580
     # Shrink GPU memory after execution

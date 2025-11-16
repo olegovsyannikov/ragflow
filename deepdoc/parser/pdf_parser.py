@@ -278,14 +278,20 @@ class RAGFlowPdfParser:
                 b["SP"] = ii
 
     def __ocr(self, pagenum, img, chars, ZM=3, device_id: int | None = None):
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: Starting __ocr method")
         start = timer()
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: About to call ocr.detect()")
         bxs = self.ocr.detect(np.array(img), device_id)
         logging.info(f"__ocr detecting boxes of a image cost ({timer() - start}s)")
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: ocr.detect() returned {len(bxs) if bxs else 0} boxes")
 
         start = timer()
         if not bxs:
+            logging.debug(f"[OCR-DEBUG] Page {pagenum}: No boxes detected, returning early")
             self.boxes.append([])
             return
+
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: Processing detected boxes")
         bxs = [(line[0], line[1][0]) for line in bxs]
         bxs = Recognizer.sort_Y_firstly(
             [
@@ -295,6 +301,7 @@ class RAGFlowPdfParser:
             ],
             self.mean_height[pagenum - 1] / 3,
         )
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: Sorted boxes, starting char merging")
 
         # merge chars in the same rect
         for c in chars:
@@ -309,6 +316,7 @@ class RAGFlowPdfParser:
                 continue
             bxs[ii]["chars"].append(c)
 
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: Finished char merging, processing text")
         for b in bxs:
             if not b["chars"]:
                 del b["chars"]
@@ -323,6 +331,7 @@ class RAGFlowPdfParser:
             del b["chars"]
 
         logging.info(f"__ocr sorting {len(chars)} chars cost {timer() - start}s")
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: Preparing boxes for recognition")
         start = timer()
         boxes_to_reg = []
         img_np = np.array(img)
@@ -332,11 +341,16 @@ class RAGFlowPdfParser:
                 b["box_image"] = self.ocr.get_rotate_crop_image(img_np, np.array([[left, top], [right, top], [right, bott], [left, bott]], dtype=np.float32))
                 boxes_to_reg.append(b)
             del b["txt"]
+
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: About to recognize {len(boxes_to_reg)} boxes")
         texts = self.ocr.recognize_batch([b["box_image"] for b in boxes_to_reg], device_id)
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: Recognition complete")
+
         for i in range(len(boxes_to_reg)):
             boxes_to_reg[i]["text"] = texts[i]
             del boxes_to_reg[i]["box_image"]
         logging.info(f"__ocr recognize {len(bxs)} boxes cost {timer() - start}s")
+        logging.debug(f"[OCR-DEBUG] Page {pagenum}: __ocr method completed successfully")
         bxs = [b for b in bxs if b["text"]]
         if self.mean_height[pagenum - 1] == 0:
             self.mean_height[pagenum - 1] = np.median([b["bottom"] - b["top"] for b in bxs])
