@@ -14,24 +14,5 @@
 #  limitations under the License.
 #
 
-# Monkey patch to fix Python 3.10 logging flush parameter issue
-# Some dependencies call logging methods with flush=True, but Logger._log() doesn't accept it
-import logging
-
-_original_log = logging.Logger._log
-
-def _patched_log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1, **kwargs):
-    """Patched _log method that filters out the 'flush' parameter."""
-    # Remove flush from kwargs before passing to original _log
-    kwargs.pop('flush', None)
-    # Call original _log with filtered kwargs
-    if exc_info is not None or extra is not None or stack_info or stacklevel != 1:
-        return _original_log(self, level, msg, args, exc_info=exc_info, extra=extra, 
-                           stack_info=stack_info, stacklevel=stacklevel)
-    else:
-        return _original_log(self, level, msg, args)
-
-logging.Logger._log = _patched_log
-
 from beartype.claw import beartype_this_package
 beartype_this_package()
